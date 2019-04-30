@@ -1,64 +1,103 @@
 <?php
 
+
 class Machine
 {
     private $machineCoins;
-    private $pickupSlot;
+    
     private $returnCoinsSlot;
-
-
-    private $products;
-
-
-
+    
+    private $pickupSlot;
+    
+    private $productCount;
+    
     public function __construct()
     {
-        $this->machineCoins = file_get_contents("productsCoins.txt");
-        $this->products = array(
-            "1A" => array("name" => "golf", "price" => 45, "count" => file_get_contents('1A.txt')),
-            "2C" => array("name" => "sýrový mlsoun", "price" => 80, "count" => file_get_contents('2C.txt')),
-        );
+        $this->returnCoinsSlot = null;
         $this->pickupSlot = null;
     }
-    public function buyProduct($insertedCoins, $productNumber = "1A")
+    
+    public function buyProduct($insertedCoins, $productCode)
     {
-        var_dump($insertedCoins);
-        var_dump($this->products[$productNumber]['price']);
-        $returnCoins = $insertedCoins - $this->products[$productNumber]['price'];
-        if (($insertedCoins>= $this->products[$productNumber]['price'])
-        && ($this->productsCount > 0)
-        && ($this->machineCoins>=$returnCoins)) {
-            $this->machineCoins-= $returnCoins;
-            file_put_contents("productsCoins.txt", $this->machineCoins);
-            $this->productsCount--;
-            file_put_contents("productsCount.txt", $this->productsCount);
-            $this->pickupSlot = $this->products[$productNumber]['name'];
-            $this->returnCoinsSlot = $returnCoins;
-            return true;
+        if (empty($insertedCoins)) {
+            return("Hej tak zaplať ne?");
         }
-        return false;
-    }
-    public function getPickupSlot()
-    {
-        if (empty($this->pickupSlot)) {
-            $this->pickupSlot = "Nic tu není... :(";
+        if (empty($productCode)) {
+            return("Zmáčkni něco...");
         }
-        return $this->pickupSlot;
-    }
-    public function getProductsCount()
-    {
-        $productsCount = 0;
-
-        foreach ($this->products as $product) {
-            $productsCount += $product['count'];
+        
+        $machineCoins = self::getMachineCoins();
+        $productName = self::getProductName($productCode);
+        $productPrice = self::getProductPrice($productCode);
+        $productCount = self::getProductCount($productCode);
+        $returnCoins = $insertedCoins - $productPrice;
+        if ($insertedCoins >= $productPrice) {
+            if ($productCount > 0) {
+                if ($machineCoins >= $returnCoins) {
+                    $productCount--;
+                    $machineCoins -= $returnCoins;
+                    $machineCoins += $productPrice;
+                    $this->pickupSlot = $productName;
+                    $this->returnCoinsSlot = $returnCoins;
+                    self::saveChanges($productCode, $productCount, $machineCoins);
+                    return true;
+                } else {
+                    return "Není dost peněz na vrácení";
+                }
+            } else {
+                return "Prázdný automat";
+            }
+        } else {
+            return "Chudej lol. Moc málo peněz";
         }
     }
+    
+    
     public function getMachineCoins()
     {
-        return $this->machineCoins;
+        $stats = self::getStats();
+        return $stats['machineCoins'];
     }
+   
+    public function getPickupSlot()
+    {
+        return $this->pickupSlot;
+    }
+   
     public function getReturnCoinsSlot()
     {
         return $this->returnCoinsSlot;
+    }
+    
+    private function getProductName($productCode)
+    {
+        $stats = self::getStats();
+        return $stats['products'][$productCode]['name'];
+    }
+   
+    private function getProductPrice($productCode)
+    {
+        $stats = self::getStats();
+        return $stats['products'][$productCode]['price'];
+    }
+   
+    private function getProductCount($productCode)
+    {
+        $stats = self::getStats();
+        return $stats['products'][$productCode]['count'];
+    }
+   
+    public function getStats($file = "stats.json")
+    {
+        return json_decode(file_get_contents($file), true);
+    }
+    
+    private function saveChanges($productCode, $productCount, $machineCoins)
+    {
+        $stats = self::getStats();
+        $stats['products'][$productCode]['count'] = $productCount;
+        $stats['machineCoins'] = $machineCoins;
+        file_put_contents("stats.json", json_encode($stats, JSON_PRETTY_PRINT));
+        return true;
     }
 }
